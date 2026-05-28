@@ -7,7 +7,7 @@ import (
 type Initiative struct {
 	ID             string    `gorm:"primaryKey" json:"id"`
 	Name           string    `json:"name"`
-	Owner          string    `json:"owner"`
+	Owner          string    `gorm:"type:uuid;column:owner" json:"owner"`
 	Address        string    `json:"address"`
 	CEP            string    `json:"cep"`
 	EmailOwner     string    `json:"email_owner"`
