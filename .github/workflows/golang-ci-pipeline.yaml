@@ -1,0 +1,13 @@
+name: Golang CI Pipeline
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  push: 
+    branches: [master, develop]
+permissions:
+  contents: read
+jobs:
+  config:
+    uses: kauanpecanha/odsquiz-workflows/.github/workflows/golang-ci-pipeline.yaml@main
+    
