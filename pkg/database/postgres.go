@@ -34,12 +34,13 @@ func NewPostgresConnection(cfg *config.Config) (*gorm.DB, error) {
 
 	// Open the database connection
 	db, err := gorm.Open(postgres.Open(connStr), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger:         logger.Default.LogMode(logger.Info),
+		TranslateError: true,
 	})
 	if err != nil {
 		log.Fatal("Failed to connect to database. \n", err)
 	}
-	DB = Dbinstance{ Db: db }
+	DB = Dbinstance{Db: db}
 	return db, nil
 }
 
