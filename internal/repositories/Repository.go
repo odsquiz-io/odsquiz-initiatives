@@ -68,7 +68,7 @@ func (r *repository) ReadOneByID(id string) (*models.Initiative, error) {
 func (r *repository) ReadOneByEmail(email string) (*models.Initiative, error) {
 	var one models.Initiative
 
-	err := r.DB.First(&one, "email = ?", email).Error
+	err := r.DB.First(&one, "email_owner = ?", email).Error
 	if err != nil {
 		return nil, err
 	}
@@ -79,26 +79,29 @@ func (r *repository) ReadOneByEmail(email string) (*models.Initiative, error) {
 func (r *repository) UpdateOne(one *models.Initiative) (*models.Initiative, error) {
 	one.UpdatedAt = time.Now()
 
-	err := r.DB.Model(&models.Initiative{}).
+	result := r.DB.Model(&models.Initiative{}).
 		Where("id = ?", one.ID).
-		Updates(one).Error
+		Updates(one)
 
-	if err != nil {
-		return nil, err
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, gorm.ErrRecordNotFound
 	}
 
 	return one, nil
 }
 
 func (r *repository) DeleteOne(id string) error {
-	_, err := uuid.Parse(id)
-	if err != nil {
-		return err
+	result := r.DB.Delete(&models.Initiative{}, "id = ?", id)
+	if result.Error != nil {
+		return result.Error
 	}
 
-	err = r.DB.Delete(&models.Initiative{}, "id = ?", id).Error
-	if err != nil {
-		return err
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
 	}
 
 	return nil
