@@ -1,0 +1,14 @@
+.git
+.github
+.agents
+.codex
+.env
+.env.*
+Dockerfile
+README.md
+internal.md
+tmp
+dist
+build
+coverage
+*.log

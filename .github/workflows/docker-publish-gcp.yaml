@@ -1,0 +1,18 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches: [master, main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    uses: odsquiz-io/odsquiz-workflows/.github/workflows/docker-build-push-pipeline.yaml@main
+    permissions:
+      contents: read
+      id-token: write
