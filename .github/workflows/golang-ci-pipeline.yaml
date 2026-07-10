@@ -3,11 +3,22 @@ name: Golang CI Pipeline
 on:
   pull_request:
     types: [opened, reopened, synchronize]
-  push: 
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'go.work'
+      - 'go.work.sum'
+  push:
     branches: [master, develop]
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'go.work'
+      - 'go.work.sum'
 permissions:
   contents: read
 jobs:
   config:
-    uses: kauanpecanha/odsquiz-workflows/.github/workflows/golang-ci-pipeline.yaml@main
-    
+    uses: odsquiz-io/odsquiz-workflows/.github/workflows/golang-ci-pipeline.yaml@main
