@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"github.com/gofiber/fiber/v3"
@@ -9,6 +10,7 @@ import (
 	"github.com/kauanpecanha/odsquiz-initiatives/internal/migrations"
 	"github.com/kauanpecanha/odsquiz-initiatives/internal/routes"
 	"github.com/kauanpecanha/odsquiz-initiatives/pkg/config"
+	"github.com/kauanpecanha/odsquiz-initiatives/pkg/database"
 )
 
 func main() {
@@ -16,10 +18,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
-	err = migrations.RunMigrations()
+
+	startupCtx, cancel := context.WithTimeout(context.Background(), database.StartupConnectionTimeout)
+	defer cancel()
+
+	err = migrations.RunMigrations(startupCtx, cfg)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("database initialization failed: %v", err)
 	}
 
 	app := fiber.New(fiber.Config{
@@ -29,6 +34,6 @@ func main() {
 	app.Use(cors.New())
 
 	routes.Setup(app)
-	
+
 	log.Fatal(app.Listen(":" + cfg.Port))
 }
