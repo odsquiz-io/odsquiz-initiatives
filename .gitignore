@@ -1,2 +1,7 @@
 internal.md
 .env*
+
+# Keep only repository-maintained Markdown documentation.
+*.md
+!README.md
+!readme.md
