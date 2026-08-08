@@ -3,6 +3,7 @@ module github.com/kauanpecanha/odsquiz-initiatives
 go 1.26.3
 
 require (
+	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/gofiber/fiber/v3 v3.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0

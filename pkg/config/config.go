@@ -22,7 +22,9 @@ type Config struct {
 
 // Load reads configuration from environment variables and validates required fields.
 func Load() (*Config, error) {
-	// Load environment variables from .env file if present
+	// Local configuration takes precedence over .env. Cloud Run injects
+	// environment variables directly, and godotenv.Load does not overwrite them.
+	_ = godotenv.Load(".env.local")
 	_ = godotenv.Load()
 
 	// Create config struct with values from environment
@@ -34,6 +36,13 @@ func Load() (*Config, error) {
 		DBUser:     os.Getenv("DB_USER"),
 		DBPassword: os.Getenv("DB_PASSWORD"),
 		DBName:     os.Getenv("DB_NAME"),
+		DBSSLMode:  os.Getenv("DB_SSLMODE"),
+	}
+	if cfg.DBSSLMode == "" {
+		cfg.DBSSLMode = os.Getenv("DBSSLMode")
+	}
+	if cfg.DBSSLMode == "" {
+		cfg.DBSSLMode = "require"
 	}
 
 	// Validate that required database fields are set

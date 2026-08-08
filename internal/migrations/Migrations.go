@@ -1,27 +1,23 @@
 package migrations
 
 import (
-	"log"
+	"context"
+	"fmt"
 
 	"github.com/kauanpecanha/odsquiz-initiatives/internal/models"
 	"github.com/kauanpecanha/odsquiz-initiatives/pkg/config"
 	"github.com/kauanpecanha/odsquiz-initiatives/pkg/database"
 )
 
-func RunMigrations() error {
-	cfg, err := config.Load()
+func RunMigrations(ctx context.Context, cfg *config.Config) error {
+	db, err := database.NewPostgresConnection(ctx, cfg)
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	db, err := database.NewPostgresConnection(cfg)
-	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("connect to database: %w", err)
 	}
 
 	if err := db.AutoMigrate(&models.Initiative{}); err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("migrate initiatives: %w", err)
 	}
 
-	return err
+	return nil
 }
