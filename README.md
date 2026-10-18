@@ -67,13 +67,16 @@ docker build -t odsquiz-initiatives .
 
 - `POST /api/initiatives`
 - `GET /api/initiatives`
+- `GET /api/initiatives/mine`
 - `GET /api/initiatives/:id`
 - `PATCH /api/initiatives/:id`
 - `DELETE /api/initiatives/:id`
 - `GET /health`
 
-Initiative CRUD routes require a bearer token from the auth API. The public
-load balancer exposes this service through `/api/initiatives/*`.
+Initiative CRUD routes require a bearer token from the auth API. The token's
+`sub` claim becomes the owner of created initiatives and selects the ones
+returned by `GET /api/initiatives/mine`, newest first. The public load balancer
+exposes this service through `/api/initiatives/*`.
 
 ## Configuration convention
 

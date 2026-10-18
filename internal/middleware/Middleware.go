@@ -9,6 +9,9 @@ import (
 	"github.com/kauanpecanha/odsquiz-initiatives/pkg/config"
 )
 
+// ContextUserID holds the authenticated user's identifier, from the "sub" claim.
+const ContextUserID = "userID"
+
 // Protected function to setup Authorization Header handling
 func Protected() fiber.Handler {
 
@@ -39,6 +42,9 @@ func Protected() fiber.Handler {
 
 		// token return
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, jwt.ErrTokenSignatureInvalid
+			}
 			return secretKey, nil
 		})
 
@@ -49,6 +55,14 @@ func Protected() fiber.Handler {
 			})
 		}
 
+		subject, err := token.Claims.GetSubject()
+		if err != nil || subject == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "missing user id claim",
+			})
+		}
+
+		c.Locals(ContextUserID, subject)
 		return c.Next()
 	}
 }

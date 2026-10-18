@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/kauanpecanha/odsquiz-initiatives/internal/apperrors"
+	"github.com/kauanpecanha/odsquiz-initiatives/internal/middleware"
 	"github.com/kauanpecanha/odsquiz-initiatives/internal/models"
 	"github.com/kauanpecanha/odsquiz-initiatives/internal/services"
 )
@@ -37,12 +38,28 @@ func respondError(c fiber.Ctx, err error) error {
 	})
 }
 
+func authenticatedUserID(c fiber.Ctx) (string, error) {
+	userID, _ := c.Locals(middleware.ContextUserID).(string)
+	if userID == "" {
+		return "", apperrors.Unauthorized(apperrors.CodeInvalidCredentials, nil)
+	}
+
+	return userID, nil
+}
+
 func (h *Handler) CreateOne(c fiber.Ctx) error {
+	userID, err := authenticatedUserID(c)
+	if err != nil {
+		return respondError(c, err)
+	}
+
 	one := new(models.Initiative)
 
 	if err := c.Bind().Body(one); err != nil {
 		return respondError(c, apperrors.BadRequest(apperrors.CodeInvalidRequest, err))
 	}
+
+	one.Owner = userID
 
 	createdOne, err := h.Service.CreateOne(one)
 	if err != nil {
@@ -54,6 +71,20 @@ func (h *Handler) CreateOne(c fiber.Ctx) error {
 
 func (h *Handler) GetAllOnes(c fiber.Ctx) error {
 	ones, err := h.Service.GetAllOnes()
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	return c.Status(fiber.StatusOK).JSON(ones)
+}
+
+func (h *Handler) GetMine(c fiber.Ctx) error {
+	userID, err := authenticatedUserID(c)
+	if err != nil {
+		return respondError(c, err)
+	}
+
+	ones, err := h.Service.GetOnesByOwner(userID)
 	if err != nil {
 		return respondError(c, err)
 	}
