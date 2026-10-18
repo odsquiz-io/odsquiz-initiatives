@@ -78,6 +78,27 @@ Initiative CRUD routes require a bearer token from the auth API. The token's
 returned by `GET /api/initiatives/mine`, newest first. The public load balancer
 exposes this service through `/api/initiatives/*`.
 
+`POST` and `PATCH` accept only `name`, `address`, `cep`, `city`, `state`,
+`email_owner`, `acting_area`, `impact`, `type`, `main_ods`, `lat`, and `lon`;
+other body fields such as `owner`, `points`, or the suspension fields are
+ignored. `PATCH` changes only the fields sent with non-zero values and returns
+the full initiative.
+
+Moderation happens in the admin service; this API enforces it:
+
+- A user whose `users.suspended_at` is set gets
+  `403 {"code":"account_suspended"}` on `POST`, `PATCH`, and `DELETE`.
+- Only the owner can `PATCH` or `DELETE` an initiative; anyone else gets
+  `403 {"code":"forbidden"}`.
+- Suspended initiatives (`suspended_at` set) are left out of
+  `GET /api/initiatives`, and `GET /api/initiatives/:id` answers
+  `404 {"code":"initiative_not_found"}` for them unless the requester owns
+  them. `GET /api/initiatives/mine` keeps them, with `suspended_at` and
+  `suspension_reason`.
+
+The older aliases (`/createOne`, `/getAllOnes`, `/getOneById/:id`,
+`/updateOne/:id`, `/deleteOne/:id`) share these handlers and rules.
+
 ## Configuration convention
 
 Use `DB_SSLMODE` in all new configuration. The application temporarily accepts

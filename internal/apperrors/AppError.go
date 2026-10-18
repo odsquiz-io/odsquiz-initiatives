@@ -7,6 +7,7 @@ type Kind string
 const (
 	KindBadRequest   Kind = "bad_request"
 	KindUnauthorized Kind = "unauthorized"
+	KindForbidden    Kind = "forbidden"
 	KindNotFound     Kind = "not_found"
 	KindConflict     Kind = "conflict"
 	KindInternal     Kind = "internal"
@@ -17,6 +18,8 @@ type Code string
 const (
 	CodeInvalidRequest     Code = "invalid_request"
 	CodeInvalidCredentials Code = "invalid_credentials"
+	CodeAccountSuspended   Code = "account_suspended"
+	CodeForbidden          Code = "forbidden"
 	CodeInitiativeNotFound Code = "initiative_not_found"
 	CodeEmailAlreadyExists Code = "email_already_exists"
 	CodeInternalError      Code = "internal_error"
@@ -46,6 +49,10 @@ func BadRequest(code Code, err error) *Error {
 
 func Unauthorized(code Code, err error) *Error {
 	return &Error{Kind: KindUnauthorized, Code: code, Err: err}
+}
+
+func Forbidden(code Code, err error) *Error {
+	return &Error{Kind: KindForbidden, Code: code, Err: err}
 }
 
 func NotFound(code Code, err error) *Error {

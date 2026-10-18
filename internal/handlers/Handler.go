@@ -25,6 +25,8 @@ func respondError(c fiber.Ctx, err error) error {
 		status = fiber.StatusBadRequest
 	case apperrors.KindUnauthorized:
 		status = fiber.StatusUnauthorized
+	case apperrors.KindForbidden:
+		status = fiber.StatusForbidden
 	case apperrors.KindNotFound:
 		status = fiber.StatusNotFound
 	case apperrors.KindConflict:
@@ -53,15 +55,13 @@ func (h *Handler) CreateOne(c fiber.Ctx) error {
 		return respondError(c, err)
 	}
 
-	one := new(models.Initiative)
+	request := new(models.InitiativeRequest)
 
-	if err := c.Bind().Body(one); err != nil {
+	if err := c.Bind().Body(request); err != nil {
 		return respondError(c, apperrors.BadRequest(apperrors.CodeInvalidRequest, err))
 	}
 
-	one.Owner = userID
-
-	createdOne, err := h.Service.CreateOne(one)
+	createdOne, err := h.Service.CreateOne(userID, request.Initiative())
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -70,7 +70,7 @@ func (h *Handler) CreateOne(c fiber.Ctx) error {
 }
 
 func (h *Handler) GetAllOnes(c fiber.Ctx) error {
-	ones, err := h.Service.GetAllOnes()
+	ones, err := h.Service.GetActiveOnes()
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -93,14 +93,19 @@ func (h *Handler) GetMine(c fiber.Ctx) error {
 }
 
 func (h *Handler) GetOneByID(c fiber.Ctx) error {
+	userID, err := authenticatedUserID(c)
+	if err != nil {
+		return respondError(c, err)
+	}
+
 	id := c.Params("id")
 
-	_, err := uuid.Parse(id)
+	_, err = uuid.Parse(id)
 	if err != nil {
 		return respondError(c, apperrors.BadRequest(apperrors.CodeInvalidRequest, err))
 	}
 
-	one, err := h.Service.GetOneByID(id)
+	one, err := h.Service.GetOneByID(userID, id)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -109,23 +114,28 @@ func (h *Handler) GetOneByID(c fiber.Ctx) error {
 }
 
 func (h *Handler) UpdateOne(c fiber.Ctx) error {
+	userID, err := authenticatedUserID(c)
+	if err != nil {
+		return respondError(c, err)
+	}
+
 	id := c.Params("id")
 
-	_, err := uuid.Parse(id)
+	_, err = uuid.Parse(id)
 	if err != nil {
 		return respondError(c, apperrors.BadRequest(apperrors.CodeInvalidRequest, err))
 	}
 
-	one := new(models.Initiative)
+	request := new(models.InitiativeRequest)
 
-	if err := c.Bind().Body(one); err != nil {
+	if err := c.Bind().Body(request); err != nil {
 		return respondError(c, apperrors.BadRequest(apperrors.CodeInvalidRequest, err))
 	}
 
-	// force route param ID
+	one := request.Initiative()
 	one.ID = id
 
-	updatedOne, err := h.Service.UpdateOne(one)
+	updatedOne, err := h.Service.UpdateOne(userID, one)
 	if err != nil {
 		return respondError(c, err)
 	}
@@ -134,14 +144,19 @@ func (h *Handler) UpdateOne(c fiber.Ctx) error {
 }
 
 func (h *Handler) DeleteOne(c fiber.Ctx) error {
+	userID, err := authenticatedUserID(c)
+	if err != nil {
+		return respondError(c, err)
+	}
+
 	id := c.Params("id")
 
-	_, err := uuid.Parse(id)
+	_, err = uuid.Parse(id)
 	if err != nil {
 		return respondError(c, apperrors.BadRequest(apperrors.CodeInvalidRequest, err))
 	}
 
-	err = h.Service.DeleteOne(id)
+	err = h.Service.DeleteOne(userID, id)
 	if err != nil {
 		return respondError(c, err)
 	}
