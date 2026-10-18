@@ -31,6 +31,15 @@ func (s *Service) GetAllOnes() ([]models.Initiative, error) {
 	return ones, nil
 }
 
+func (s *Service) GetOnesByOwner(owner string) ([]models.Initiative, error) {
+	ones, err := s.Repo.ReadOnesByOwner(owner)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+
+	return ones, nil
+}
+
 func (s *Service) GetOneByID(id string) (*models.Initiative, error) {
 	one, err := s.Repo.ReadOneByID(id)
 	if err != nil {

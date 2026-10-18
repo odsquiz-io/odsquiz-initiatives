@@ -11,6 +11,7 @@ import (
 type Repository interface {
 	CreateOne(one *models.Initiative) (*models.Initiative, error)
 	ReadOnes() ([]models.Initiative, error)
+	ReadOnesByOwner(owner string) ([]models.Initiative, error)
 	ReadOneByID(id string) (*models.Initiative, error)
 	ReadOneByEmail(email string) (*models.Initiative, error)
 	UpdateOne(one *models.Initiative) (*models.Initiative, error)
@@ -47,6 +48,17 @@ func (r *repository) ReadOnes() ([]models.Initiative, error) {
 	var ones []models.Initiative
 
 	err := r.DB.Find(&ones).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return ones, nil
+}
+
+func (r *repository) ReadOnesByOwner(owner string) ([]models.Initiative, error) {
+	ones := []models.Initiative{}
+
+	err := r.DB.Where("owner = ?", owner).Order("created_at DESC").Find(&ones).Error
 	if err != nil {
 		return nil, err
 	}

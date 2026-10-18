@@ -24,6 +24,8 @@ func Setup(app *fiber.App) {
 	// protected routes (can be used ONLY with bearer token)
 	app.Post("/api/initiatives", middleware.Protected(), handler.CreateOne)
 	app.Get("/api/initiatives", middleware.Protected(), handler.GetAllOnes)
+	// must stay before /:id, which would otherwise capture "mine"
+	app.Get("/api/initiatives/mine", middleware.Protected(), handler.GetMine)
 	app.Get("/api/initiatives/:id", middleware.Protected(), handler.GetOneByID)
 	app.Patch("/api/initiatives/:id", middleware.Protected(), handler.UpdateOne)
 	app.Delete("/api/initiatives/:id", middleware.Protected(), handler.DeleteOne)
