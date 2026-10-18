@@ -10,12 +10,13 @@ import (
 
 type Repository interface {
 	CreateOne(one *models.Initiative) (*models.Initiative, error)
-	ReadOnes() ([]models.Initiative, error)
+	ReadActiveOnes() ([]models.Initiative, error)
 	ReadOnesByOwner(owner string) ([]models.Initiative, error)
 	ReadOneByID(id string) (*models.Initiative, error)
 	ReadOneByEmail(email string) (*models.Initiative, error)
 	UpdateOne(one *models.Initiative) (*models.Initiative, error)
 	DeleteOne(id string) error
+	IsUserSuspended(id string) (bool, error)
 }
 
 type repository struct {
@@ -44,10 +45,10 @@ func (r *repository) CreateOne(one *models.Initiative) (*models.Initiative, erro
 	return one, nil
 }
 
-func (r *repository) ReadOnes() ([]models.Initiative, error) {
-	var ones []models.Initiative
+func (r *repository) ReadActiveOnes() ([]models.Initiative, error) {
+	ones := []models.Initiative{}
 
-	err := r.DB.Find(&ones).Error
+	err := r.DB.Where("suspended_at IS NULL").Find(&ones).Error
 	if err != nil {
 		return nil, err
 	}
@@ -117,4 +118,15 @@ func (r *repository) DeleteOne(id string) error {
 	}
 
 	return nil
+}
+
+func (r *repository) IsUserSuspended(id string) (bool, error) {
+	var count int64
+
+	err := r.DB.Table("users").Where("id = ? AND suspended_at IS NOT NULL", id).Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
 }
