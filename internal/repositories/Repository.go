@@ -14,7 +14,7 @@ type Repository interface {
 	ReadOnesByOwner(owner string) ([]models.Initiative, error)
 	ReadOneByID(id string) (*models.Initiative, error)
 	ReadOneByEmail(email string) (*models.Initiative, error)
-	UpdateOne(one *models.Initiative) (*models.Initiative, error)
+	UpdateOne(one *models.Initiative, columns ...string) (*models.Initiative, error)
 	DeleteOne(id string) error
 	IsUserSuspended(id string) (bool, error)
 }
@@ -89,12 +89,16 @@ func (r *repository) ReadOneByEmail(email string) (*models.Initiative, error) {
 	return &one, nil
 }
 
-func (r *repository) UpdateOne(one *models.Initiative) (*models.Initiative, error) {
+// UpdateOne writes only the given columns, zero values included; without columns it skips zero values.
+func (r *repository) UpdateOne(one *models.Initiative, columns ...string) (*models.Initiative, error) {
 	one.UpdatedAt = time.Now()
 
-	result := r.DB.Model(&models.Initiative{}).
-		Where("id = ?", one.ID).
-		Updates(one)
+	query := r.DB.Model(&models.Initiative{}).Where("id = ?", one.ID)
+	if len(columns) > 0 {
+		query = query.Select(append(columns, "updated_at"))
+	}
+
+	result := query.Updates(one)
 
 	if result.Error != nil {
 		return nil, result.Error
@@ -107,17 +111,32 @@ func (r *repository) UpdateOne(one *models.Initiative) (*models.Initiative, erro
 	return one, nil
 }
 
+// DeleteOne also removes the initiative's comments, posts and members, since databases created by
+// AutoMigrate have no cascading foreign keys.
 func (r *repository) DeleteOne(id string) error {
-	result := r.DB.Delete(&models.Initiative{}, "id = ?", id)
-	if result.Error != nil {
-		return result.Error
-	}
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		dependents := []string{
+			"DELETE FROM initiative_post_comments WHERE post_id::text IN (SELECT id::text FROM initiative_posts WHERE initiative_id::text = ?)",
+			"DELETE FROM initiative_posts WHERE initiative_id::text = ?",
+			"DELETE FROM initiative_members WHERE initiative_id::text = ?",
+		}
+		for _, statement := range dependents {
+			if err := tx.Exec(statement, id).Error; err != nil {
+				return err
+			}
+		}
 
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
+		result := tx.Delete(&models.Initiative{}, "id = ?", id)
+		if result.Error != nil {
+			return result.Error
+		}
 
-	return nil
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+
+		return nil
+	})
 }
 
 func (r *repository) IsUserSuspended(id string) (bool, error) {

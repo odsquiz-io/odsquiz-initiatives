@@ -47,7 +47,7 @@ func (r *fakeRepository) ReadOneByEmail(string) (*models.Initiative, error) {
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (r *fakeRepository) UpdateOne(one *models.Initiative) (*models.Initiative, error) {
+func (r *fakeRepository) UpdateOne(one *models.Initiative, _ ...string) (*models.Initiative, error) {
 	return one, nil
 }
 
@@ -72,7 +72,12 @@ func newService() (*Service, *fakeRepository) {
 		"from-blocked": {ID: "from-blocked", Owner: suspendedID},
 	}}
 
-	return &Service{Repo: repo}, repo
+	return &Service{
+		Repo:    repo,
+		Members: newFakeMembers(),
+		Logos:   &fakeLogos{repo: repo},
+		Storage: &fakeStorage{objects: map[string][]byte{}},
+	}, repo
 }
 
 func assertCode(t *testing.T, err error, want apperrors.Code) {

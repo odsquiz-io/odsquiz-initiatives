@@ -15,7 +15,10 @@ func RunMigrations(ctx context.Context, cfg *config.Config) error {
 		return fmt.Errorf("connect to database: %w", err)
 	}
 
-	if err := db.AutoMigrate(&models.Initiative{}); err != nil {
+	tables := append([]any{&models.Initiative{}}, models.MembersModels()...)
+	tables = append(tables, models.PostsModels()...)
+
+	if err := db.AutoMigrate(tables...); err != nil {
 		return fmt.Errorf("migrate initiatives: %w", err)
 	}
 

@@ -1,19 +1,33 @@
 package services
 
 import (
+	"context"
 	"errors"
+	"log"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/kauanpecanha/odsquiz-initiatives/internal/apperrors"
 	"github.com/kauanpecanha/odsquiz-initiatives/internal/models"
 	"github.com/kauanpecanha/odsquiz-initiatives/internal/repositories"
+	"github.com/kauanpecanha/odsquiz-initiatives/pkg/storage"
 	"gorm.io/gorm"
 )
 
+const maxDescriptionLength = 2000
+
 type Service struct {
-	Repo repositories.Repository
+	Repo    repositories.Repository
+	Members repositories.MembersRepository
+	Logos   repositories.LogoRepository
+	Storage storage.Storage
 }
 
 func (s *Service) CreateOne(userID string, one *models.Initiative) (*models.Initiative, error) {
+	if err := normalizeDescription(one); err != nil {
+		return nil, err
+	}
+
 	if err := s.ensureActiveUser(userID); err != nil {
 		return nil, err
 	}
@@ -46,13 +60,36 @@ func (s *Service) GetOnesByOwner(owner string) ([]models.Initiative, error) {
 	return ones, nil
 }
 
-func (s *Service) GetOneByID(userID, id string) (*models.Initiative, error) {
+func (s *Service) GetOneByID(userID, id string) (*models.InitiativeDetail, error) {
+	one, err := s.readVisible(userID, id)
+	if err != nil {
+		return nil, err
+	}
+
+	role, err := s.viewerRole(userID, one)
+	if err != nil {
+		return nil, err
+	}
+
+	count, err := s.Members.CountActiveMembers(id)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+
+	return &models.InitiativeDetail{
+		InitiativeResponse: models.NewInitiativeResponse(*one),
+		ViewerRole:         role,
+		MembersCount:       count,
+	}, nil
+}
+
+// readVisible reads an initiative; suspended initiatives stay visible only to their owners.
+func (s *Service) readVisible(userID, id string) (*models.Initiative, error) {
 	one, err := s.Repo.ReadOneByID(id)
 	if err != nil {
 		return nil, mapInitiativeReadError(err)
 	}
 
-	// Suspended initiatives stay visible only to their owners.
 	if one.SuspendedAt != nil && one.Owner != userID {
 		return nil, apperrors.NotFound(apperrors.CodeInitiativeNotFound, nil)
 	}
@@ -60,12 +97,35 @@ func (s *Service) GetOneByID(userID, id string) (*models.Initiative, error) {
 	return one, nil
 }
 
-func (s *Service) UpdateOne(userID string, one *models.Initiative) (*models.Initiative, error) {
-	if err := s.authorizeChange(userID, one.ID); err != nil {
+func (s *Service) viewerRole(userID string, one *models.Initiative) (*string, error) {
+	if one.Owner == userID {
+		role := models.ViewerRoleOwner
+		return &role, nil
+	}
+
+	member, err := s.Members.IsActiveMember(one.ID, userID)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+
+	if !member {
+		return nil, nil
+	}
+
+	role := models.ViewerRoleMember
+	return &role, nil
+}
+
+func (s *Service) UpdateOne(userID string, one *models.Initiative, columns ...string) (*models.Initiative, error) {
+	if err := normalizeDescription(one); err != nil {
 		return nil, err
 	}
 
-	if _, err := s.Repo.UpdateOne(one); err != nil {
+	if _, err := s.authorizeChange(userID, one.ID); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.Repo.UpdateOne(one, columns...); err != nil {
 		return nil, mapInitiativeWriteError(err)
 	}
 
@@ -78,7 +138,8 @@ func (s *Service) UpdateOne(userID string, one *models.Initiative) (*models.Init
 }
 
 func (s *Service) DeleteOne(userID, id string) error {
-	if err := s.authorizeChange(userID, id); err != nil {
+	one, err := s.authorizeChange(userID, id)
+	if err != nil {
 		return err
 	}
 
@@ -86,25 +147,31 @@ func (s *Service) DeleteOne(userID, id string) error {
 		return mapInitiativeReadError(err)
 	}
 
+	if one.LogoObject != nil && s.Storage != nil {
+		if err := s.Storage.Delete(context.Background(), *one.LogoObject); err != nil && !errors.Is(err, storage.ErrNotFound) {
+			log.Printf("delete logo of initiative %s: %v", id, err)
+		}
+	}
+
 	return nil
 }
 
 // authorizeChange allows changes only by the initiative's owner, while the account is not suspended.
-func (s *Service) authorizeChange(userID, id string) error {
+func (s *Service) authorizeChange(userID, id string) (*models.Initiative, error) {
 	if err := s.ensureActiveUser(userID); err != nil {
-		return err
+		return nil, err
 	}
 
 	one, err := s.Repo.ReadOneByID(id)
 	if err != nil {
-		return mapInitiativeReadError(err)
+		return nil, mapInitiativeReadError(err)
 	}
 
 	if one.Owner != userID {
-		return apperrors.Forbidden(apperrors.CodeForbidden, nil)
+		return nil, apperrors.Forbidden(apperrors.CodeForbidden, nil)
 	}
 
-	return nil
+	return one, nil
 }
 
 func (s *Service) ensureActiveUser(userID string) error {
@@ -117,6 +184,21 @@ func (s *Service) ensureActiveUser(userID string) error {
 		return apperrors.Forbidden(apperrors.CodeAccountSuspended, nil)
 	}
 
+	return nil
+}
+
+// normalizeDescription trims the "Sobre" text; a nil description is left unchanged.
+func normalizeDescription(one *models.Initiative) error {
+	if one.Description == nil {
+		return nil
+	}
+
+	description := strings.TrimSpace(*one.Description)
+	if utf8.RuneCountInString(description) > maxDescriptionLength {
+		return apperrors.BadRequest(apperrors.CodeInvalidRequest, nil)
+	}
+
+	one.Description = &description
 	return nil
 }
 

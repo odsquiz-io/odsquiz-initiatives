@@ -11,6 +11,7 @@ import (
 	"github.com/kauanpecanha/odsquiz-initiatives/internal/routes"
 	"github.com/kauanpecanha/odsquiz-initiatives/pkg/config"
 	"github.com/kauanpecanha/odsquiz-initiatives/pkg/database"
+	"github.com/kauanpecanha/odsquiz-initiatives/pkg/storage"
 )
 
 func main() {
@@ -33,7 +34,12 @@ func main() {
 
 	app.Use(cors.New())
 
-	routes.Setup(app)
+	logos, err := storage.New(context.Background(), cfg.StorageBucket)
+	if err != nil {
+		log.Printf("logo storage unavailable: %v", err)
+	}
+
+	routes.Setup(app, logos)
 
 	log.Fatal(app.Listen(":" + cfg.Port))
 }
