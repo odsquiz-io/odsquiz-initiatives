@@ -18,6 +18,8 @@ type Config struct {
 	DBPassword string // Database password
 	DBName     string // Database name
 	DBSSLMode  string // Database SSL mode
+
+	StorageBucket string // Cloud Storage bucket for initiative logos; logo endpoints are unavailable when empty
 }
 
 // Load reads configuration from environment variables and validates required fields.
@@ -37,6 +39,8 @@ func Load() (*Config, error) {
 		DBPassword: os.Getenv("DB_PASSWORD"),
 		DBName:     os.Getenv("DB_NAME"),
 		DBSSLMode:  os.Getenv("DB_SSLMODE"),
+
+		StorageBucket: os.Getenv("STORAGE_BUCKET"),
 	}
 	if cfg.DBSSLMode == "" {
 		cfg.DBSSLMode = os.Getenv("DBSSLMode")

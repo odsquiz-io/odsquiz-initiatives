@@ -8,12 +8,16 @@ import (
 	"github.com/kauanpecanha/odsquiz-initiatives/internal/repositories"
 	"github.com/kauanpecanha/odsquiz-initiatives/internal/services"
 	"github.com/kauanpecanha/odsquiz-initiatives/pkg/database"
+	"github.com/kauanpecanha/odsquiz-initiatives/pkg/storage"
 )
 
-func Setup(app *fiber.App) {
-	repository := repositories.NewRepo(database.DB.Db)
+func Setup(app *fiber.App, logos storage.Storage) {
+	db := database.DB.Db
 	service := &services.Service{
-		Repo: repository,
+		Repo:    repositories.NewRepo(db),
+		Members: repositories.NewMembersRepo(db),
+		Logos:   repositories.NewLogoRepo(db),
+		Storage: logos,
 	}
 	handler := &handlers.Handler{
 		Service: service,
@@ -24,8 +28,10 @@ func Setup(app *fiber.App) {
 	// protected routes (can be used ONLY with bearer token)
 	app.Post("/api/initiatives", middleware.Protected(), handler.CreateOne)
 	app.Get("/api/initiatives", middleware.Protected(), handler.GetAllOnes)
-	// must stay before /:id, which would otherwise capture "mine"
+	// literal segments must stay before /:id, which would otherwise capture them
 	app.Get("/api/initiatives/mine", middleware.Protected(), handler.GetMine)
+	RegisterMembers(app, handler)
+	RegisterPosts(app, db, service)
 	app.Get("/api/initiatives/:id", middleware.Protected(), handler.GetOneByID)
 	app.Patch("/api/initiatives/:id", middleware.Protected(), handler.UpdateOne)
 	app.Delete("/api/initiatives/:id", middleware.Protected(), handler.DeleteOne)
