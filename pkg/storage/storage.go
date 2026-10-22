@@ -68,7 +68,7 @@ func (b *Bucket) Get(ctx context.Context, name string) ([]byte, error) {
 	if err != nil {
 		return nil, mapError(err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	return io.ReadAll(reader)
 }

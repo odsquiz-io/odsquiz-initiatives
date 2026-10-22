@@ -37,7 +37,7 @@ func (h *Handler) SetLogo(c fiber.Ctx) error {
 	if err != nil {
 		return respondError(c, apperrors.BadRequest(apperrors.CodeInvalidRequest, err))
 	}
-	defer content.Close()
+	defer func() { _ = content.Close() }()
 
 	data, err := io.ReadAll(io.LimitReader(content, services.MaxLogoSize+1))
 	if err != nil {
