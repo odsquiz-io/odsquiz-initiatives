@@ -65,20 +65,6 @@ func NewMembersRepo(db *gorm.DB) MembersRepository {
 	return &membersRepository{DB: db}
 }
 
-// IsActiveMember reports whether the user accepted an invitation to the initiative.
-func IsActiveMember(db *gorm.DB, initiativeID, userID string) (bool, error) {
-	var count int64
-
-	err := db.Table("initiative_members").
-		Where("initiative_id = ? AND user_id = ? AND status = ?", initiativeID, userID, models.MemberStatusActive).
-		Count(&count).Error
-	if err != nil {
-		return false, err
-	}
-
-	return count > 0, nil
-}
-
 func (r *membersRepository) FindUser(id string) (*models.MemberAccount, error) {
 	return r.findUser(r.DB.Where("id = ?", id))
 }
@@ -126,8 +112,18 @@ func (r *membersRepository) ReadMemberByUser(initiativeID, userID string) (*mode
 	return &member, nil
 }
 
+// IsActiveMember reports whether the user accepted an invitation to the initiative.
 func (r *membersRepository) IsActiveMember(initiativeID, userID string) (bool, error) {
-	return IsActiveMember(r.DB, initiativeID, userID)
+	var count int64
+
+	err := r.DB.Model(&models.InitiativeMember{}).
+		Where("initiative_id = ? AND user_id = ? AND status = ?", initiativeID, userID, models.MemberStatusActive).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
 }
 
 func (r *membersRepository) CountActiveMembers(initiativeID string) (int64, error) {

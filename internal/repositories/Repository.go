@@ -15,7 +15,7 @@ type Repository interface {
 	ReadOneByID(id string) (*models.Initiative, error)
 	ReadOneByEmail(email string) (*models.Initiative, error)
 	UpdateOne(one *models.Initiative, columns ...string) (*models.Initiative, error)
-	DeleteOne(id string) error
+	DeleteOne(id string) ([]string, error)
 	IsUserSuspended(id string) (bool, error)
 }
 
@@ -111,19 +111,22 @@ func (r *repository) UpdateOne(one *models.Initiative, columns ...string) (*mode
 	return one, nil
 }
 
-// DeleteOne also removes the initiative's comments, posts and members, since databases created by
-// AutoMigrate have no cascading foreign keys.
-func (r *repository) DeleteOne(id string) error {
-	return r.DB.Transaction(func(tx *gorm.DB) error {
-		dependents := []string{
-			"DELETE FROM initiative_post_comments WHERE post_id::text IN (SELECT id::text FROM initiative_posts WHERE initiative_id::text = ?)",
-			"DELETE FROM initiative_posts WHERE initiative_id::text = ?",
-			"DELETE FROM initiative_members WHERE initiative_id::text = ?",
+// DeleteOne also removes the initiative's members and photos, since databases created by AutoMigrate
+// have no cascading foreign keys, and returns the storage objects of the removed photos.
+func (r *repository) DeleteOne(id string) ([]string, error) {
+	objects := []string{}
+
+	err := r.DB.Transaction(func(tx *gorm.DB) error {
+		if err := lockInitiative(tx, id); err != nil {
+			return err
 		}
-		for _, statement := range dependents {
-			if err := tx.Exec(statement, id).Error; err != nil {
-				return err
-			}
+
+		if err := tx.Exec("DELETE FROM initiative_members WHERE initiative_id::text = ?", id).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Raw("DELETE FROM initiative_photos WHERE initiative_id::text = ? RETURNING object", id).Scan(&objects).Error; err != nil {
+			return err
 		}
 
 		result := tx.Delete(&models.Initiative{}, "id = ?", id)
@@ -137,6 +140,11 @@ func (r *repository) DeleteOne(id string) error {
 
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return objects, nil
 }
 
 func (r *repository) IsUserSuspended(id string) (bool, error) {

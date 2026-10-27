@@ -92,7 +92,7 @@ func TestSetLogoAcceptsOnlySmallImages(t *testing.T) {
 		{"gif", ownerID, []byte("GIF89a\x01\x00\x01\x00"), apperrors.CodeInvalidImage, ""},
 		{"svg", ownerID, []byte(`<svg xmlns="http://www.w3.org/2000/svg"></svg>`), apperrors.CodeInvalidImage, ""},
 		{"empty", ownerID, nil, apperrors.CodeInvalidImage, ""},
-		{"too large", ownerID, append(bytes.Clone(pngLogo), make([]byte, MaxLogoSize)...), apperrors.CodeImageTooLarge, ""},
+		{"too large", ownerID, append(bytes.Clone(pngLogo), make([]byte, MaxImageSize)...), apperrors.CodeImageTooLarge, ""},
 		{"not the owner", otherUserID, pngLogo, apperrors.CodeForbidden, ""},
 	}
 

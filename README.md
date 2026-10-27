@@ -87,34 +87,47 @@ Logo, members and invitations:
 - `POST /api/initiatives/invitations/:memberId/decline`
 - `GET /api/initiatives/memberships`
 
-Posts and comments:
+Photos:
 
-- `GET /api/initiatives/feed`
-- `GET /api/initiatives/:id/posts`
-- `POST /api/initiatives/:id/posts`
-- `PATCH /api/initiatives/posts/:postId`
-- `DELETE /api/initiatives/posts/:postId`
-- `GET /api/initiatives/posts/:postId/comments`
-- `POST /api/initiatives/posts/:postId/comments`
-- `PATCH /api/initiatives/comments/:commentId`
-- `DELETE /api/initiatives/comments/:commentId`
+- `GET /api/initiatives/:id/photos`
+- `POST /api/initiatives/:id/photos` (multipart field `photo`, optional `caption`)
+- `PUT /api/initiatives/:id/photos/order`
+- `PATCH /api/initiatives/:id/photos/:photoId`
+- `DELETE /api/initiatives/:id/photos/:photoId`
+- `GET /api/initiatives/:id/photos/:photoId/image` (public, no token)
 
 - `GET /health`
 
-Every route except the logo `GET` and `/health` requires a bearer token from
-the auth API. The token's `sub` claim becomes the owner of created initiatives
-and selects the ones returned by `GET /api/initiatives/mine`, newest first. The
-public load balancer exposes this service through `/api/initiatives/*`. Literal
-segments (`mine`, `feed`, `invitations`, `memberships`, `posts`, `comments`) are
-registered before `/api/initiatives/:id`.
+Every route except the logo and photo image `GET`s and `/health` requires a
+bearer token from the auth API. The token's `sub` claim becomes the owner of
+created initiatives and selects the ones returned by `GET /api/initiatives/mine`,
+newest first. The public load balancer exposes this service through
+`/api/initiatives/*`. Literal segments (`mine`, `invitations`, `memberships`) are
+registered before `/api/initiatives/:id`, and `/photos/order` before
+`/photos/:photoId`.
 
 `POST` and `PATCH` accept only `name`, `address`, `cep`, `city`, `state`,
-`email_owner`, `acting_area`, `impact`, `type`, `main_ods`, `lat`, `lon`, and
-`description` (up to 2000 characters); other body fields such as `owner`,
-`points`, or the suspension fields are ignored. `PATCH` changes exactly the
-fields present in the body, zero values included, and returns the full
-initiative. Responses expose `description` and `logo_url`; `GET /:id` also
-returns `viewer_role` (`owner`, `member` or `null`) and `members_count`.
+`email_owner`, `acting_area`, `impact`, `type`, `main_ods`, `lat`, `lon`,
+`description` (up to 2000 characters), `whatsapp`, `instagram` and `website`;
+other body fields such as `owner`, `points`, or the suspension fields are
+ignored. `PATCH` changes exactly the fields present in the body, zero values
+included, and returns the full initiative. Responses expose `description`,
+`logo_url`, `whatsapp`, `instagram` and `website`; `GET /:id` also returns
+`viewer_role` (`owner`, `member` or `null`) and `members_count`.
+
+The contact fields are optional; an empty string or `null` clears them, and
+they are stored normalized:
+
+- `whatsapp`: digits only, with `55` prepended to a 10 or 11 digit number
+  (DDD + number); `(11) 98765-4321` becomes `5511987654321`. Anything that does
+  not end up as 12 or 13 digits starting with `55` answers
+  `400 {"code":"invalid_whatsapp"}`.
+- `instagram`: the handle without `@`, taken from `handle`, `@handle`,
+  `instagram.com/handle` or `https://www.instagram.com/handle/?...`; it must
+  match `^[A-Za-z0-9._]{1,30}$`, else `invalid_instagram`.
+- `website`: `https://` is prepended when there is no scheme; it must be an
+  absolute `http`/`https` URL without spaces or user info, whose host contains a
+  dot, up to 255 characters, else `invalid_website`.
 
 Moderation happens in the admin service; this API enforces it:
 
@@ -127,25 +140,39 @@ Moderation happens in the admin service; this API enforces it:
   `404 {"code":"initiative_not_found"}` for them unless the requester owns
   them. `GET /api/initiatives/mine` keeps them, with `suspended_at` and
   `suspension_reason`.
-- Posts and comments are hidden when they are suspended, when their author is
-  suspended, or when their initiative is suspended.
+- Photos follow their initiative: `GET /:id/photos` answers
+  `initiative_not_found` for a suspended initiative unless the requester owns
+  it, and the public image answers `404 {"code":"photo_not_found"}` while the
+  initiative is suspended.
 
 Members join by invitation: the owner invites a registered user by e-mail and
-the invitee accepts or declines; a member can leave at any time. The owner and
-active members publish posts; any active user comments. Authors edit their own
-posts and comments; authors and the initiative owner delete them. Deleting an
-initiative also deletes its members, posts, comments and logo.
+the invitee accepts or declines; a member can leave at any time. Deleting an
+initiative also deletes its members, photos and logo.
+
+Photos are listed as `{"id", "url", "caption", "position"}`, ordered by
+`position`; position `0` is the cover. Only the owner adds, captions, reorders
+and deletes them. An initiative holds up to 12 photos; another upload answers
+`409 {"code":"photo_limit_reached"}`. Captions are trimmed, up to 200
+characters, and an empty caption becomes `null`. `PATCH` takes
+`{"caption": string|null}`; `PUT /photos/order` takes `{"photo_ids": [...]}`,
+which must list every current photo exactly once (else `invalid_request`), and
+returns the reordered list. Deleting a photo moves the following ones back one
+position. Images follow the logo rules below.
 
 The older aliases (`/createOne`, `/getAllOnes`, `/getOneById/:id`,
 `/updateOne/:id`, `/deleteOne/:id`) share these handlers and rules.
 
-## Logo storage
+## Image storage
 
-Logos live in Google Cloud Storage, in the bucket named by `STORAGE_BUCKET`.
-On Cloud Run the client uses the service account through Application Default
-Credentials; locally it talks to the emulator set by `STORAGE_EMULATOR_HOST`.
-Without `STORAGE_BUCKET` the service still starts and the logo routes answer
-`503 {"code":"storage_unavailable"}`.
+Logos and photos live in Google Cloud Storage, in the bucket named by
+`STORAGE_BUCKET`, as `initiatives/<id>/logo-<hash>.<ext>` and
+`initiatives/<id>/photos/<photoId>-<hash>.<ext>`. Uploads are PNG, JPEG or WebP
+images up to 2 MiB (`image_too_large`, `invalid_image`). The public image
+routes send an `ETag` and are cached for good when the URL's `v` matches the
+current hash. On Cloud Run the client uses the service account through
+Application Default Credentials; locally it talks to the emulator set by
+`STORAGE_EMULATOR_HOST`. Without `STORAGE_BUCKET` the service still starts and
+the image routes answer `503 {"code":"storage_unavailable"}`.
 
 ## Configuration convention
 

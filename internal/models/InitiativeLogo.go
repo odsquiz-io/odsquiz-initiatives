@@ -20,8 +20,13 @@ func LogoHash(logoObject *string) string {
 		return ""
 	}
 
-	name := path.Base(*logoObject)
-	hash, ok := strings.CutPrefix(strings.TrimSuffix(name, path.Ext(name)), "logo-")
+	return objectHash(*logoObject, "logo-")
+}
+
+// objectHash extracts the content hash that follows the prefix in a stored image's file name.
+func objectHash(object, prefix string) string {
+	name := path.Base(object)
+	hash, ok := strings.CutPrefix(strings.TrimSuffix(name, path.Ext(name)), prefix)
 	if !ok || hash == "" || strings.Trim(hash, "0123456789abcdef") != "" {
 		return ""
 	}
