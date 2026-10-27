@@ -18,6 +18,7 @@ const (
 
 type fakeRepository struct {
 	ones        map[string]models.Initiative
+	photos      *fakePhotos
 	deleted     []string
 	usersFailed bool
 }
@@ -51,9 +52,9 @@ func (r *fakeRepository) UpdateOne(one *models.Initiative, _ ...string) (*models
 	return one, nil
 }
 
-func (r *fakeRepository) DeleteOne(id string) error {
+func (r *fakeRepository) DeleteOne(id string) ([]string, error) {
 	r.deleted = append(r.deleted, id)
-	return nil
+	return r.photos.deleteInitiative(id), nil
 }
 
 func (r *fakeRepository) IsUserSuspended(id string) (bool, error) {
@@ -71,11 +72,13 @@ func newService() (*Service, *fakeRepository) {
 		"hidden":       {ID: "hidden", Owner: ownerID, SuspendedAt: &suspendedAt},
 		"from-blocked": {ID: "from-blocked", Owner: suspendedID},
 	}}
+	repo.photos = &fakePhotos{repo: repo, rows: map[string]models.InitiativePhoto{}}
 
 	return &Service{
 		Repo:    repo,
 		Members: newFakeMembers(),
 		Logos:   &fakeLogos{repo: repo},
+		Photos:  repo.photos,
 		Storage: &fakeStorage{objects: map[string][]byte{}},
 	}, repo
 }

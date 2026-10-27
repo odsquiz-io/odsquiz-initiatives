@@ -17,6 +17,7 @@ func Setup(app *fiber.App, logos storage.Storage) {
 		Repo:    repositories.NewRepo(db),
 		Members: repositories.NewMembersRepo(db),
 		Logos:   repositories.NewLogoRepo(db),
+		Photos:  repositories.NewPhotosRepo(db),
 		Storage: logos,
 	}
 	handler := &handlers.Handler{
@@ -31,7 +32,7 @@ func Setup(app *fiber.App, logos storage.Storage) {
 	// literal segments must stay before /:id, which would otherwise capture them
 	app.Get("/api/initiatives/mine", middleware.Protected(), handler.GetMine)
 	RegisterMembers(app, handler)
-	RegisterPosts(app, db, service)
+	RegisterPhotos(app, handler)
 	app.Get("/api/initiatives/:id", middleware.Protected(), handler.GetOneByID)
 	app.Patch("/api/initiatives/:id", middleware.Protected(), handler.UpdateOne)
 	app.Delete("/api/initiatives/:id", middleware.Protected(), handler.DeleteOne)

@@ -176,7 +176,7 @@ func (h *Handler) DeleteOne(c fiber.Ctx) error {
 // updatableColumns lists the request keys a PATCH may change; their JSON names match the columns.
 var updatableColumns = []string{
 	"name", "address", "cep", "city", "state", "email_owner", "acting_area",
-	"impact", "type", "main_ods", "lat", "lon", "description",
+	"impact", "type", "main_ods", "lat", "lon", "description", "whatsapp", "instagram", "website",
 }
 
 // sentColumns returns the updatable columns present in the body, so a PATCH can set zero values.

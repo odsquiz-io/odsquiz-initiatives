@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"errors"
-	"log"
 	"strings"
 	"unicode/utf8"
 
@@ -20,11 +19,12 @@ type Service struct {
 	Repo    repositories.Repository
 	Members repositories.MembersRepository
 	Logos   repositories.LogoRepository
+	Photos  repositories.PhotosRepository
 	Storage storage.Storage
 }
 
 func (s *Service) CreateOne(userID string, one *models.Initiative) (*models.Initiative, error) {
-	if err := normalizeDescription(one); err != nil {
+	if err := normalizeProfile(one); err != nil {
 		return nil, err
 	}
 
@@ -117,7 +117,7 @@ func (s *Service) viewerRole(userID string, one *models.Initiative) (*string, er
 }
 
 func (s *Service) UpdateOne(userID string, one *models.Initiative, columns ...string) (*models.Initiative, error) {
-	if err := normalizeDescription(one); err != nil {
+	if err := normalizeProfile(one); err != nil {
 		return nil, err
 	}
 
@@ -143,13 +143,18 @@ func (s *Service) DeleteOne(userID, id string) error {
 		return err
 	}
 
-	if err := s.Repo.DeleteOne(id); err != nil {
+	objects, err := s.Repo.DeleteOne(id)
+	if err != nil {
 		return mapInitiativeReadError(err)
 	}
 
-	if one.LogoObject != nil && s.Storage != nil {
-		if err := s.Storage.Delete(context.Background(), *one.LogoObject); err != nil && !errors.Is(err, storage.ErrNotFound) {
-			log.Printf("delete logo of initiative %s: %v", id, err)
+	if one.LogoObject != nil {
+		objects = append(objects, *one.LogoObject)
+	}
+
+	if s.Storage != nil {
+		for _, object := range objects {
+			s.deleteObject(context.Background(), object)
 		}
 	}
 
@@ -185,6 +190,14 @@ func (s *Service) ensureActiveUser(userID string) error {
 	}
 
 	return nil
+}
+
+func normalizeProfile(one *models.Initiative) error {
+	if err := normalizeDescription(one); err != nil {
+		return err
+	}
+
+	return normalizeContacts(one)
 }
 
 // normalizeDescription trims the "Sobre" text; a nil description is left unchanged.

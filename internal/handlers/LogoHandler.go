@@ -24,24 +24,9 @@ func (h *Handler) SetLogo(c fiber.Ctx) error {
 		return respondError(c, err)
 	}
 
-	file, err := c.FormFile("logo")
+	data, err := formImage(c, "logo")
 	if err != nil {
-		return respondError(c, apperrors.BadRequest(apperrors.CodeInvalidRequest, err))
-	}
-
-	if file.Size > services.MaxLogoSize {
-		return respondError(c, apperrors.BadRequest(apperrors.CodeImageTooLarge, nil))
-	}
-
-	content, err := file.Open()
-	if err != nil {
-		return respondError(c, apperrors.BadRequest(apperrors.CodeInvalidRequest, err))
-	}
-	defer func() { _ = content.Close() }()
-
-	data, err := io.ReadAll(io.LimitReader(content, services.MaxLogoSize+1))
-	if err != nil {
-		return respondError(c, apperrors.BadRequest(apperrors.CodeInvalidRequest, err))
+		return respondError(c, err)
 	}
 
 	ctx, cancel := context.WithTimeout(c.Context(), storageTimeout)
@@ -89,9 +74,39 @@ func (h *Handler) GetLogo(c fiber.Ctx) error {
 		return respondError(c, err)
 	}
 
-	etag := `"` + logo.Hash + `"`
+	return sendImage(c, logo, h.Service.ReadLogo)
+}
+
+// formImage reads an uploaded image from a multipart field, refusing files above services.MaxImageSize.
+func formImage(c fiber.Ctx, field string) ([]byte, error) {
+	file, err := c.FormFile(field)
+	if err != nil {
+		return nil, apperrors.BadRequest(apperrors.CodeInvalidRequest, err)
+	}
+
+	if file.Size > services.MaxImageSize {
+		return nil, apperrors.BadRequest(apperrors.CodeImageTooLarge, nil)
+	}
+
+	content, err := file.Open()
+	if err != nil {
+		return nil, apperrors.BadRequest(apperrors.CodeInvalidRequest, err)
+	}
+	defer func() { _ = content.Close() }()
+
+	data, err := io.ReadAll(io.LimitReader(content, services.MaxImageSize+1))
+	if err != nil {
+		return nil, apperrors.BadRequest(apperrors.CodeInvalidRequest, err)
+	}
+
+	return data, nil
+}
+
+// sendImage answers with a stored image, cached for good when the URL carries its current hash.
+func sendImage(c fiber.Ctx, image *services.Image, read func(context.Context, *services.Image) ([]byte, error)) error {
+	etag := `"` + image.Hash + `"`
 	cacheControl := "public, max-age=300"
-	if c.Query("v") == logo.Hash {
+	if c.Query("v") == image.Hash {
 		cacheControl = "public, max-age=31536000, immutable"
 	}
 
@@ -104,12 +119,12 @@ func (h *Handler) GetLogo(c fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), storageTimeout)
 	defer cancel()
 
-	data, err := h.Service.ReadLogo(ctx, logo)
+	data, err := read(ctx, image)
 	if err != nil {
 		return respondError(c, err)
 	}
 
-	c.Set(fiber.HeaderContentType, logo.ContentType)
+	c.Set(fiber.HeaderContentType, image.ContentType)
 	c.Set(fiber.HeaderETag, etag)
 	c.Set(fiber.HeaderCacheControl, cacheControl)
 	c.Set(fiber.HeaderXContentTypeOptions, "nosniff")

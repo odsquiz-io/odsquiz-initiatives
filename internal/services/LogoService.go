@@ -14,15 +14,16 @@ import (
 	"github.com/kauanpecanha/odsquiz-initiatives/pkg/storage"
 )
 
-const MaxLogoSize = 2 << 20
+const MaxImageSize = 2 << 20
 
-var logoExtensions = map[string]string{
+var imageExtensions = map[string]string{
 	"image/png":  "png",
 	"image/jpeg": "jpg",
 	"image/webp": "webp",
 }
 
-type Logo struct {
+// Image is a stored logo or photo; Hash versions its public URL.
+type Image struct {
 	Object      string
 	ContentType string
 	Hash        string
@@ -35,22 +36,16 @@ func (s *Service) SetLogo(ctx context.Context, userID, id string, data []byte) (
 		return nil, err
 	}
 
-	if len(data) > MaxLogoSize {
-		return nil, apperrors.BadRequest(apperrors.CodeImageTooLarge, nil)
+	contentType, extension, hash, err := inspectImage(data)
+	if err != nil {
+		return nil, err
 	}
 
-	contentType := http.DetectContentType(data)
-	extension, ok := logoExtensions[contentType]
-	if !ok {
-		return nil, apperrors.BadRequest(apperrors.CodeInvalidImage, nil)
-	}
-
-	sum := sha256.Sum256(data)
-	object := fmt.Sprintf("initiatives/%s/logo-%s.%s", id, hex.EncodeToString(sum[:])[:16], extension)
+	object := fmt.Sprintf("initiatives/%s/logo-%s.%s", id, hash, extension)
 	previous := one.LogoObject
 
 	if err := s.Storage.Put(ctx, object, contentType, data); err != nil {
-		return nil, mapStorageError(err)
+		return nil, mapStorageError(err, apperrors.CodeLogoNotFound)
 	}
 
 	if err := s.Logos.SetLogo(id, &object, &contentType); err != nil {
@@ -78,7 +73,7 @@ func (s *Service) RemoveLogo(ctx context.Context, userID, id string) (*models.In
 	}
 
 	if err := s.Storage.Delete(ctx, *one.LogoObject); err != nil && !errors.Is(err, storage.ErrNotFound) {
-		return nil, mapStorageError(err)
+		return nil, mapStorageError(err, apperrors.CodeLogoNotFound)
 	}
 
 	if err := s.Logos.SetLogo(id, nil, nil); err != nil {
@@ -89,7 +84,7 @@ func (s *Service) RemoveLogo(ctx context.Context, userID, id string) (*models.In
 }
 
 // FindLogo returns the logo of an initiative that is not suspended.
-func (s *Service) FindLogo(id string) (*Logo, error) {
+func (s *Service) FindLogo(id string) (*Image, error) {
 	one, err := s.Repo.ReadOneByID(id)
 	if err != nil {
 		return nil, mapNotFound(err, apperrors.CodeLogoNotFound)
@@ -100,16 +95,37 @@ func (s *Service) FindLogo(id string) (*Logo, error) {
 		return nil, apperrors.NotFound(apperrors.CodeLogoNotFound, nil)
 	}
 
-	return &Logo{Object: *one.LogoObject, ContentType: *one.LogoContentType, Hash: hash}, nil
+	return &Image{Object: *one.LogoObject, ContentType: *one.LogoContentType, Hash: hash}, nil
 }
 
-func (s *Service) ReadLogo(ctx context.Context, logo *Logo) ([]byte, error) {
-	data, err := s.Storage.Get(ctx, logo.Object)
+func (s *Service) ReadLogo(ctx context.Context, logo *Image) ([]byte, error) {
+	return s.readImage(ctx, logo, apperrors.CodeLogoNotFound)
+}
+
+func (s *Service) readImage(ctx context.Context, image *Image, notFound apperrors.Code) ([]byte, error) {
+	data, err := s.Storage.Get(ctx, image.Object)
 	if err != nil {
-		return nil, mapStorageError(err)
+		return nil, mapStorageError(err, notFound)
 	}
 
 	return data, nil
+}
+
+// inspectImage accepts PNG, JPEG and WebP images up to MaxImageSize and returns their content type,
+// file extension and the hash that names their object.
+func inspectImage(data []byte) (contentType, extension, hash string, err error) {
+	if len(data) > MaxImageSize {
+		return "", "", "", apperrors.BadRequest(apperrors.CodeImageTooLarge, nil)
+	}
+
+	contentType = http.DetectContentType(data)
+	extension, ok := imageExtensions[contentType]
+	if !ok {
+		return "", "", "", apperrors.BadRequest(apperrors.CodeInvalidImage, nil)
+	}
+
+	sum := sha256.Sum256(data)
+	return contentType, extension, hex.EncodeToString(sum[:])[:16], nil
 }
 
 func (s *Service) readOne(id string) (*models.Initiative, error) {
@@ -124,13 +140,13 @@ func (s *Service) readOne(id string) (*models.Initiative, error) {
 // deleteObject removes an object that is no longer referenced; a failure only leaves an orphan behind.
 func (s *Service) deleteObject(ctx context.Context, object string) {
 	if err := s.Storage.Delete(ctx, object); err != nil && !errors.Is(err, storage.ErrNotFound) {
-		log.Printf("delete logo object %s: %v", object, err)
+		log.Printf("delete object %s: %v", object, err)
 	}
 }
 
-func mapStorageError(err error) error {
+func mapStorageError(err error, notFound apperrors.Code) error {
 	if errors.Is(err, storage.ErrNotFound) {
-		return apperrors.NotFound(apperrors.CodeLogoNotFound, err)
+		return apperrors.NotFound(notFound, err)
 	}
 
 	return apperrors.Unavailable(apperrors.CodeStorageUnavailable, err)

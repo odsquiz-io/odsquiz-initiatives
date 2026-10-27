@@ -21,6 +21,9 @@ type Initiative struct {
 	Lat              float64    `json:"lat"`
 	Lon              float64    `json:"lon"`
 	Description      *string    `gorm:"type:text" json:"-"`
+	Whatsapp         *string    `gorm:"type:varchar(13)" json:"whatsapp"`
+	Instagram        *string    `gorm:"type:varchar(30)" json:"instagram"`
+	Website          *string    `gorm:"type:varchar(255)" json:"website"`
 	LogoObject       *string    `gorm:"type:varchar(255)" json:"-"`
 	LogoContentType  *string    `gorm:"type:varchar(32)" json:"-"`
 	SuspendedAt      *time.Time `json:"suspended_at"`
@@ -44,6 +47,9 @@ type InitiativeRequest struct {
 	Lat         float64 `json:"lat"`
 	Lon         float64 `json:"lon"`
 	Description *string `json:"description"`
+	Whatsapp    *string `json:"whatsapp"`
+	Instagram   *string `json:"instagram"`
+	Website     *string `json:"website"`
 }
 
 func (r *InitiativeRequest) Initiative() *Initiative {
@@ -61,6 +67,9 @@ func (r *InitiativeRequest) Initiative() *Initiative {
 		Lat:         r.Lat,
 		Lon:         r.Lon,
 		Description: r.Description,
+		Whatsapp:    r.Whatsapp,
+		Instagram:   r.Instagram,
+		Website:     r.Website,
 	}
 }
 
