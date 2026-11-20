@@ -48,7 +48,12 @@ func NewPostgresConnection(ctx context.Context, cfg *config.Config) (*gorm.DB, e
 
 	db, err := backoff.Retry(ctx, func() (*gorm.DB, error) {
 		db, err := gorm.Open(postgres.Open(connStr), &gorm.Config{
-			Logger:         logger.Default.LogMode(logger.Info),
+			Logger: logger.New(log.Default(), logger.Config{
+				SlowThreshold:             200 * time.Millisecond,
+				LogLevel:                  logger.Warn,
+				IgnoreRecordNotFoundError: true,
+				ParameterizedQueries:      true,
+			}),
 			TranslateError: true,
 		})
 		if err == nil {
