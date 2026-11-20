@@ -5,8 +5,8 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/cors"
 
+	"github.com/kauanpecanha/odsquiz-initiatives/internal/middleware"
 	"github.com/kauanpecanha/odsquiz-initiatives/internal/migrations"
 	"github.com/kauanpecanha/odsquiz-initiatives/internal/routes"
 	"github.com/kauanpecanha/odsquiz-initiatives/pkg/config"
@@ -32,7 +32,7 @@ func main() {
 		AppName: "ODS Quiz Initiatives Microservice",
 	})
 
-	app.Use(cors.New())
+	app.Use(middleware.RequireOrigin(cfg.OriginToken))
 
 	logos, err := storage.New(context.Background(), cfg.StorageBucket)
 	if err != nil {

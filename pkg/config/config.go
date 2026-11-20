@@ -19,6 +19,7 @@ type Config struct {
 	DBName     string // Database name
 	DBSSLMode  string // Database SSL mode
 
+	OriginToken   string // Secret the Cloudflare Worker sends on API requests; the check is off when empty
 	StorageBucket string // Cloud Storage bucket for initiative logos; logo endpoints are unavailable when empty
 }
 
@@ -40,6 +41,7 @@ func Load() (*Config, error) {
 		DBName:     os.Getenv("DB_NAME"),
 		DBSSLMode:  os.Getenv("DB_SSLMODE"),
 
+		OriginToken:   os.Getenv("ORIGIN_TOKEN"),
 		StorageBucket: os.Getenv("STORAGE_BUCKET"),
 	}
 	if cfg.DBSSLMode == "" {
